@@ -20,6 +20,7 @@ if (typeof module !== "undefined") module.exports = {findCertificate, verifyFile
 
 if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded", async () => {
   const $ = id => document.getElementById(id);
+  const DROP_HINT = "or drag and drop it here";
   let records = null, current = null;
   const showMessage = (message, error = false) => { $("message").textContent = message; $("message").dataset.error = String(error); };
   function lookup() {
@@ -27,21 +28,36 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     current = null;
     $("file-result").textContent = "";
     $("pdf").value = "";
+    $("drop-name").textContent = DROP_HINT;
     if (!records) return showMessage("The registry is not available yet. Please reload the page.", true);
     const match = findCertificate(records, $("number").value);
     if (!match) return showMessage(records.length ? "Certificate number not found. Check the full number or contact the committee." : "No certificates have been published in this copy yet.", true);
     current = match;
     $("recipient").textContent = match.name;
-    $("cert-number").textContent = match.number;
+    // Break after each slash on narrow screens; <wbr> keeps the copied text identical to the number.
+    $("cert-number").replaceChildren(...match.number.split("/").flatMap((part, index) =>
+      index ? [document.createTextNode("/"), document.createElement("wbr"), document.createTextNode(part)] : [document.createTextNode(part)]));
     $("kind").textContent = match.kind === "peserta" ? "Participant" : "Committee";
-    $("status").textContent = match.status === "revoked" ? "Certificate revoked" : "Certificate on record and valid";
+    $("status").textContent = match.status === "revoked" ? "Certificate revoked" : "Verified and valid";
+    $("result").dataset.state = match.status === "revoked" ? "revoked" : "valid";
     $("result").hidden = false;
     showMessage("Issuance record found.");
+    const calm = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    $("result").scrollIntoView({behavior: calm ? "auto" : "smooth", block: "nearest"});
   }
   $("lookup").addEventListener("submit", event => { event.preventDefault(); lookup(); });
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach(name => drop.addEventListener(name, event => { event.preventDefault(); drop.dataset.over = "true"; }));
+  ["dragleave", "dragend", "drop"].forEach(name => drop.addEventListener(name, () => { drop.dataset.over = "false"; }));
+  drop.addEventListener("drop", event => {
+    event.preventDefault();
+    const files = event.dataTransfer && event.dataTransfer.files;
+    if (files && files.length) { $("pdf").files = files; $("pdf").dispatchEvent(new Event("change")); }
+  });
   $("pdf").addEventListener("change", async () => {
     const selected = $("pdf").files[0], checked = current;
     if (!selected || !checked) return;
+    $("drop-name").textContent = selected.name;
     if (selected.size > 20 * 1024 * 1024) { $("file-result").textContent = "Please choose a PDF of 20 MB or less."; return; }
     try {
       const buffer = await selected.arrayBuffer();
