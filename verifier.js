@@ -10,10 +10,10 @@ function findCertificate(records, input) {
 
 function verifyFile(record, digest) {
   const revision = record.revisions.find(item => item.sha256 === digest);
-  if (!revision) return {message: "Berkas berbeda dari versi yang tercatat. Hubungi panitia untuk pemeriksaan.", error: true};
-  if (record.status === "revoked") return {message: "Berkas tercatat, tetapi sertifikat ini telah dicabut.", error: true};
-  if (revision.status !== "valid") return {message: "Berkas ini merupakan versi lama yang sudah diganti. Gunakan PDF revisi terbaru.", error: true};
-  return {message: "Berkas cocok dengan versi sertifikat yang berlaku.", error: false};
+  if (!revision) return {message: "This file does not match the recorded version. Please contact the committee for a review.", error: true};
+  if (record.status === "revoked") return {message: "This file is on record, but the certificate has been revoked.", error: true};
+  if (revision.status !== "valid") return {message: "This file is an older version that has been replaced. Please use the latest revised PDF.", error: true};
+  return {message: "This file matches the valid version of the certificate.", error: false};
 }
 
 if (typeof module !== "undefined") module.exports = {findCertificate, verifyFile};
@@ -27,22 +27,22 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     current = null;
     $("file-result").textContent = "";
     $("pdf").value = "";
-    if (!records) return showMessage("Daftar belum tersedia. Coba muat ulang halaman.", true);
+    if (!records) return showMessage("The registry is not available yet. Please reload the page.", true);
     const match = findCertificate(records, $("number").value);
-    if (!match) return showMessage(records.length ? "Nomor belum ditemukan. Periksa nomor lengkap atau hubungi panitia." : "Belum ada sertifikat yang dipublikasikan pada salinan ini.", true);
+    if (!match) return showMessage(records.length ? "Certificate number not found. Check the full number or contact the committee." : "No certificates have been published in this copy yet.", true);
     current = match;
     $("recipient").textContent = match.name;
     $("cert-number").textContent = match.number;
-    $("kind").textContent = match.kind === "peserta" ? "Peserta" : "Panitia";
-    $("status").textContent = match.status === "revoked" ? "Sertifikat dicabut" : "Sertifikat tercatat dan berlaku";
+    $("kind").textContent = match.kind === "peserta" ? "Participant" : "Committee";
+    $("status").textContent = match.status === "revoked" ? "Certificate revoked" : "Certificate on record and valid";
     $("result").hidden = false;
-    showMessage("Catatan penerbitan ditemukan.");
+    showMessage("Issuance record found.");
   }
   $("lookup").addEventListener("submit", event => { event.preventDefault(); lookup(); });
   $("pdf").addEventListener("change", async () => {
     const selected = $("pdf").files[0], checked = current;
     if (!selected || !checked) return;
-    if (selected.size > 20 * 1024 * 1024) { $("file-result").textContent = "Pilih PDF maksimal 20 MB."; return; }
+    if (selected.size > 20 * 1024 * 1024) { $("file-result").textContent = "Please choose a PDF of 20 MB or less."; return; }
     try {
       const buffer = await selected.arrayBuffer();
       const header = new TextDecoder("ascii").decode(buffer.slice(0, 5));
@@ -53,7 +53,7 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
       $("file-result").textContent = result.message;
       $("file-result").dataset.error = String(result.error);
     } catch (error) {
-      $("file-result").textContent = "Berkas belum dapat diperiksa. Gunakan PDF asli dan browser terbaru melalui HTTPS.";
+      $("file-result").textContent = "The file could not be checked. Use the original PDF and an up-to-date browser over HTTPS.";
       $("file-result").dataset.error = "true";
     }
   });
@@ -66,11 +66,11 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     const registry = JSON.parse(registryText);
     if (registry.schema_version !== 1 || !Array.isArray(registry.certificates)) throw new Error("schema");
     records = registry.certificates;
-    $("updated").textContent = "Salinan diperbarui: " + new Date(publication.exported_at).toLocaleString("id-ID", {timeZone: "Asia/Makassar"}) + " WITA";
-    showMessage(records.length ? "Daftar siap diperiksa." : "Belum ada sertifikat yang dipublikasikan pada salinan ini.");
+    $("updated").textContent = "Copy updated: " + new Date(publication.exported_at).toLocaleString("en-GB", {timeZone: "Asia/Makassar"}) + " WITA (UTC+8)";
+    showMessage(records.length ? "Registry ready. Enter a certificate number." : "No certificates have been published in this copy yet.");
     const number = new URLSearchParams(location.search).get("number");
     if (number) { $("number").value = number; lookup(); }
   } catch (error) {
-    showMessage("Salinan verifikasi belum tersedia. Coba kembali atau hubungi panitia.", true);
+    showMessage("The verification copy is not available. Please try again later or contact the committee.", true);
   }
 });
